@@ -1,0 +1,206 @@
+version: 2
+name: safe-upstream-update
+description: Integrate upstream/main into a fresh fork main and open a reviewed draft PR.
+nodes:
+  - id: start
+    type: start
+  - id: preflight
+    type: check
+    command: bash scripts/upstream-update.sh preflight
+  - id: needed
+    type: check
+    command: bash scripts/upstream-update.sh needed
+  - id: merge
+    type: check
+    command: bash scripts/upstream-update.sh merge
+  - id: conflict
+    type: check
+    command: bash scripts/upstream-update.sh conflict
+  - id: resolve
+    type: agent
+    prompt: >-
+      Resolve the in-progress upstream merge in this task worktree. Inspect the
+
+      common ancestor, fork changes and upstream changes. Preserve the intent of
+
+      fork customizations and integrate upstream behavior; do not blindly choose
+
+      ours or theirs. Adapt interfaces and add regression tests where needed.
+
+      Stage resolutions and complete the merge commit. Do not push, deploy,
+      reset
+
+      or abort the merge. If compatibility cannot be established, fail
+      explicitly.
+
+      Merge output: {{nodes.merge.output}}
+    runner: codex
+  - id: verify
+    type: check
+    command: bash scripts/upstream-update.sh verify
+  - id: checks
+    type: check
+    command: timeout 900 npm run check
+  - id: retry
+    type: loop
+    max: 2
+  - id: repair
+    type: agent
+    prompt: >-
+      Repair the upstream integration while preserving fork customizations.
+
+      Check output: {{nodes.checks.output}}
+
+      Review feedback: {{nodes.review.summary}}
+
+      Add appropriate regression tests and commit the repair. Do not push or
+      deploy.
+
+      If the problem cannot be safely fixed, fail explicitly.
+    runner: codex
+  - id: review
+    type: agent
+    prompt: >-
+      Independently review this upstream integration without modifying files.
+
+      Compare the task branch with origin/main and upstream/main. Look for lost
+
+      fork customizations, incompatibilities, migrations and security
+      regressions.
+
+      Assess the actual check output: {{nodes.checks.output}}
+
+      Report concrete findings and residual risks. End with exactly one of:
+
+      CEZ:VERDICT approve
+
+      CEZ:VERDICT changes
+
+      CEZ:VERDICT blocked
+    runner: codex
+    verdicts:
+      - approve
+      - changes
+      - blocked
+  - id: approval
+    type: gate.human
+    message: >-
+      Upstream integration and checks completed. Review:
+      {{nodes.review.summary}}
+
+      Approve to push this task branch and create a draft PR to the task's base
+
+      branch. Reject or timeout leaves the fork unchanged. No deployment occurs.
+    timeoutMs: 604800000
+  - id: pr
+    type: github.draft-pr
+    title: Integrate upstream Horolog updates
+  - id: success
+    type: end
+    status: success
+  - id: failed
+    type: end
+    status: failed
+edges:
+  - from: start.next
+    to: preflight
+  - from: preflight.pass
+    to: needed
+  - from: preflight.fail
+    to: failed
+  - from: needed.pass
+    to: merge
+  - from: needed.fail
+    to: success
+  - from: merge.pass
+    to: verify
+  - from: merge.fail
+    to: conflict
+  - from: conflict.pass
+    to: resolve
+  - from: conflict.fail
+    to: failed
+  - from: resolve.done
+    to: verify
+  - from: resolve.failed
+    to: failed
+  - from: verify.pass
+    to: checks
+  - from: verify.fail
+    to: failed
+  - from: checks.pass
+    to: review
+  - from: checks.fail
+    to: retry
+  - from: review.approve
+    to: approval
+  - from: review.changes
+    to: retry
+  - from: review.blocked
+    to: failed
+  - from: review.failed
+    to: failed
+  - from: retry.repeat
+    to: repair
+  - from: retry.exhausted
+    to: failed
+  - from: repair.done
+    to: verify
+  - from: repair.failed
+    to: failed
+  - from: approval.approve
+    to: pr
+  - from: approval.reject
+    to: failed
+  - from: approval.timeout
+    to: failed
+  - from: pr.created
+    to: success
+  - from: pr.failed
+    to: failed
+layout:
+  start:
+    x: 32
+    y: 151
+  preflight:
+    x: 220
+    y: 151
+  needed:
+    x: 418
+    y: 47
+  merge:
+    x: 616
+    y: 130
+  conflict:
+    x: 813
+    y: 40
+  resolve:
+    x: 979
+    y: 40
+  verify:
+    x: 32
+    y: 521
+  checks:
+    x: 230
+    y: 431
+  retry:
+    x: 764
+    y: 564
+  repair:
+    x: 961
+    y: 553
+  review:
+    x: 396
+    y: 431
+  approval:
+    x: 770
+    y: 412
+  pr:
+    x: 1050
+    y: 396
+  success:
+    x: 1323
+    y: 385
+  failed:
+    x: 1323
+    y: 537
