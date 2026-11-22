@@ -22,10 +22,12 @@ export function isMcpOAuthServerId(value: unknown): value is string {
 
 /** One persistent cookie jar per connected instance and server. */
 export function mcpOAuthPartition(appUrl: string, serverId: string) {
-  const digest = createHash("sha256")
-    .update(JSON.stringify([new URL(appUrl).origin, serverId]))
-    .digest("hex")
-    .slice(0, 24);
+  const partitionKey = JSON.stringify([new URL(appUrl).origin, serverId]);
+  const hash = createHash("sha256");
+  // This stable namespace is not a credential or password verifier.
+  // codeql[js/insufficient-password-hash]
+  hash.update(partitionKey);
+  const digest = hash.digest("hex").slice(0, 24);
   return `persist:rakazo-mcp-${digest}`;
 }
 
