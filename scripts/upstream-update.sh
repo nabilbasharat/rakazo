@@ -12,7 +12,7 @@ read_state() {
 }
 case "${1:-}" in
   preflight)
-    rm -f "$state" "$snapshot"
+    rm -f "$state" "$snapshot" "$(git rev-parse --git-path cezar-upstream-validation.sh)"
     test -z "$(git status --porcelain)" || { echo 'Worktree is not clean' >&2; exit 1; }
     branch=$(git symbolic-ref --quiet --short HEAD) || { echo 'Detached HEAD' >&2; exit 1; }
     test "$branch" != main || { echo 'Refusing to update main directly' >&2; exit 1; }
@@ -23,6 +23,7 @@ case "${1:-}" in
     test "$(git rev-parse HEAD)" = "$base" || { echo 'Task must start at the freshly fetched origin/main' >&2; exit 1; }
     git merge-base "$base" "$target" >/dev/null || { echo 'Branches have no common ancestor' >&2; exit 1; }
     git show HEAD:scripts/upstream-update.sh > "$snapshot"
+    git show HEAD:scripts/upstream-validation.sh > "$(git rev-parse --git-path cezar-upstream-validation.sh)"
     printf '%s\n%s\n' "$base" "$target" > "$state"
     printf 'Upstream commits to integrate: '
     git rev-list --count "$base..$target"

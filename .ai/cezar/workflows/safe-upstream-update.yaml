@@ -8,8 +8,12 @@ nodes:
     type: check
     command: >-
       bash scripts/upstream-update.sh preflight &&
-      { test -f "$(git rev-parse --git-path cezar-upstream-update.sh)" ||
+      { test -f "$(git rev-parse --git-path cezar-upstream-update.sh)" &&
+      test -f "$(git rev-parse --git-path cezar-upstream-validation.sh)" ||
       { echo 'Preflight script is outdated: commit and integrate the matching workflow and script into the task base before running.' >&2; exit 1; }; }
+  - id: environment
+    type: check
+    command: bash "$(git rev-parse --git-path cezar-upstream-validation.sh)" environment
   - id: current
     type: check
     command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" current
@@ -44,9 +48,15 @@ nodes:
   - id: verify
     type: check
     command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" verify
+  - id: prepare
+    type: check
+    command: bash "$(git rev-parse --git-path cezar-upstream-validation.sh)" environment && bash "$(git rev-parse --git-path cezar-upstream-validation.sh)" prepare
   - id: checks
     type: check
-    command: timeout 1800 bash -c 'pnpm lint && pnpm check && pnpm test'
+    command: bash "$(git rev-parse --git-path cezar-upstream-validation.sh)" checks
+  - id: repairable
+    type: check
+    command: bash "$(git rev-parse --git-path cezar-upstream-validation.sh)" repairable
   - id: retry
     type: loop
     max: 2
@@ -122,7 +132,11 @@ edges:
   - from: preflight.fail
     to: failed
   - from: needed.pass
+    to: environment
+  - from: environment.pass
     to: merge
+  - from: environment.fail
+    to: failed
   - from: needed.fail
     to: failed
   - from: merge.pass
@@ -138,13 +152,21 @@ edges:
   - from: resolve.failed
     to: failed
   - from: verify.pass
+    to: prepare
+  - from: prepare.pass
     to: checks
+  - from: prepare.fail
+    to: failed
   - from: verify.fail
     to: failed
   - from: checks.pass
     to: review
   - from: checks.fail
+    to: repairable
+  - from: repairable.pass
     to: retry
+  - from: repairable.fail
+    to: failed
   - from: review.approve
     to: approval
   - from: review.changes

@@ -10,6 +10,7 @@ cd "$tmp/fork"
 git checkout -q -b main
 mkdir scripts
 cp "$source_script" scripts/upstream-update.sh
+cp "$(dirname "$source_script")/upstream-validation.sh" scripts/upstream-validation.sh
 echo base > file
 git add .
 git commit -qm base
@@ -19,6 +20,14 @@ git remote add upstream "$tmp/upstream.git"
 git checkout -qb task
 bash scripts/upstream-update.sh preflight >/dev/null
 snapshot=$(git rev-parse --git-path cezar-upstream-update.sh)
+validation=$(git rev-parse --git-path cezar-upstream-validation.sh)
+check_status=$(git rev-parse --git-path cezar-upstream-check-status)
+test -f "$validation"
+if bash "$validation" repairable; then echo 'Missing status must not be repairable' >&2; exit 1; fi
+echo infrastructure-failure > "$check_status"
+if bash "$validation" repairable; then echo 'Infrastructure failure must not be repairable' >&2; exit 1; fi
+echo test-failure > "$check_status"
+bash "$validation" repairable
 bash "$snapshot" current
 if bash "$snapshot" needed 2>/dev/null; then echo 'Expected no update' >&2; exit 1; fi
 git clone -q -b main "$tmp/upstream.git" "$tmp/upstream-work"
