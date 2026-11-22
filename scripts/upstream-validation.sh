@@ -60,7 +60,7 @@ NODE
     # A service killed by its cgroup cannot write a completion marker.
     echo infrastructure-failure > "$status"
     set +e
-    timeout --kill-after=30 1860 systemd-run --user --quiet --wait --pipe --collect \
+    timeout --kill-after=30 1860 systemd-run --user --quiet --wait --pipe --collect --same-dir --setenv="PATH=$PATH" \
       -p MemoryMax=3000M -p MemorySwapMax=0 -p CPUQuota=200% -p RuntimeMaxSec=1800 \
       taskset -c "$cpus" bash -c '
         status=$1; shift
