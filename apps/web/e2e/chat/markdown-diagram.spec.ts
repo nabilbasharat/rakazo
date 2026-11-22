@@ -23,6 +23,17 @@ async function diagramMarkup(page: Page) {
   return decodeURIComponent(src?.slice(src.indexOf(",") + 1) ?? "");
 }
 
+async function diagramText(page: Page) {
+  const markup = await diagramMarkup(page);
+  return page.evaluate(
+    (svg) => {
+      const document = new DOMParser().parseFromString(svg, "image/svg+xml");
+      return document.documentElement.textContent ?? "";
+    },
+    markup,
+  );
+}
+
 async function expectDrawn(page: Page) {
   const image = page.getByTestId("chat-diagram").locator("img");
   await expect(image).toBeVisible();
@@ -47,7 +58,7 @@ test("a mermaid fence is drawn as a themed, copyable diagram in place of its cod
   expect(text.indexOf("Here is the contribution flow:")).toBeLessThan(
     text.indexOf("Each step runs in CI."),
   );
-  const drawnText = (await diagramMarkup(page)).replace(/<[^>]+>/g, "");
+  const drawnText = await diagramText(page);
   for (const label of ["Clone repo", "Branch", "Tests", "Pull request"]) {
     expect(drawnText).toContain(label);
   }

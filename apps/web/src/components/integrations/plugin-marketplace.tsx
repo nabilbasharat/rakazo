@@ -126,7 +126,32 @@ export function PluginRow({
 
 function sourceHref(source: string, sha: string | undefined) {
   const [repo, subdir] = source.split("#");
-  return subdir ? `${repo}/tree/${sha ?? "HEAD"}/${subdir}` : repo;
+  let url: URL;
+  try {
+    url = new URL(repo);
+  } catch {
+    return null;
+  }
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "github.com" ||
+    url.username ||
+    url.password ||
+    parts.length !== 2 ||
+    parts.some((part) => /%2f|%5c/i.test(part))
+  ) {
+    return null;
+  }
+  const root = `https://github.com/${parts.join("/")}`;
+  if (!subdir) return root;
+  const revision = sha && /^[a-f0-9]{40}$/i.test(sha) ? sha : "HEAD";
+  const path = subdir
+    .split("/")
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return path ? `${root}/tree/${revision}/${path}` : root;
 }
 
 const SKILLS_SHOWN = 5;
@@ -195,6 +220,7 @@ export function PluginDetail({
       : [];
   const parsed = install ? PluginPreviewSchema.safeParse(install.config) : null;
   const detail = parsed?.success ? parsed.data : preview;
+  const sourceUrl = sourceHref(selection.installedSource, detail?.resolvedSha);
   const installed = Boolean(install);
 
   useEffect(() => {
@@ -415,16 +441,18 @@ export function PluginDetail({
           <h2 className="truncate text-heading2 font-semibold text-foreground">
             {managed?.name ?? selection.name}
           </h2>
-          <a
-            href={sourceHref(selection.installedSource, detail?.resolvedSha)}
-            target="_blank"
-            rel="noreferrer"
-            title={detail ? `${selection.installedSource}@${detail.resolvedSha}` : undefined}
-            className="inline-flex items-center gap-1 text-body text-muted-foreground hover:text-foreground"
-          >
-            <Trans>View source</Trans>
-            <ArrowUpRight size={14} />
-          </a>
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={detail ? `${selection.installedSource}@${detail.resolvedSha}` : undefined}
+              className="inline-flex items-center gap-1 text-body text-muted-foreground hover:text-foreground"
+            >
+              <Trans>View source</Trans>
+              <ArrowUpRight size={14} />
+            </a>
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-2 pt-2">{headerAction()}</div>
       </div>

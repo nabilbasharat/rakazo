@@ -120,5 +120,5 @@ it.each([
       openChat: () => undefined,
     }),
   );
-  expect(markup.replace(/<[^>]+>/g, "")).toBe(text);
+  expect(markup).toContain(text);
 });

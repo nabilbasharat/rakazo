@@ -168,6 +168,11 @@ describe("plugin detail", () => {
   it("previews what a plugin adds and confirms the previewed digest", async () => {
     await render();
     expect(api.preview).toHaveBeenCalledWith({ source });
+    expect(
+      [...container.querySelectorAll("a")]
+        .find((link) => link.textContent?.includes("View source"))
+        ?.getAttribute("href"),
+    ).toBe(source);
     expect(container.textContent).toContain("https://notes.example.test/mcp");
     expect(container.textContent).toContain("skill-4");
     expect(container.textContent).not.toContain("skill-5");
@@ -238,6 +243,15 @@ describe("plugin detail", () => {
     await click("Add skills");
     expect(api.install).toHaveBeenCalledWith(expect.objectContaining({ pluginParts: ["skills"] }));
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("does not render a source link for an unsafe pasted URL", async () => {
+    await render({ pasted: "javascript:alert(1)" });
+    expect(
+      [...container.querySelectorAll("a")].some((link) =>
+        link.textContent?.includes("View source"),
+      ),
+    ).toBe(false);
   });
 
   it("adds a skill pack with one action and names parts it could not add", async () => {
