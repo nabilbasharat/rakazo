@@ -6,16 +6,22 @@ nodes:
     type: start
   - id: preflight
     type: check
-    command: bash scripts/upstream-update.sh preflight
+    command: >-
+      bash scripts/upstream-update.sh preflight &&
+      { test -f "$(git rev-parse --git-path cezar-upstream-update.sh)" ||
+      { echo 'Preflight script is outdated: commit and integrate the matching workflow and script into the task base before running.' >&2; exit 1; }; }
+  - id: current
+    type: check
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" current
   - id: needed
     type: check
-    command: bash scripts/upstream-update.sh needed
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" needed
   - id: merge
     type: check
-    command: bash scripts/upstream-update.sh merge
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" merge
   - id: conflict
     type: check
-    command: bash scripts/upstream-update.sh conflict
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" conflict
   - id: resolve
     type: agent
     prompt: >-
@@ -37,10 +43,10 @@ nodes:
     runner: codex
   - id: verify
     type: check
-    command: bash scripts/upstream-update.sh verify
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" verify
   - id: checks
     type: check
-    command: timeout 900 npm run check
+    command: timeout 1800 bash -c 'pnpm lint && pnpm check && pnpm test'
   - id: retry
     type: loop
     max: 2
@@ -92,9 +98,12 @@ nodes:
 
       branch. Reject or timeout leaves the fork unchanged. No deployment occurs.
     timeoutMs: 604800000
+  - id: final-verify
+    type: check
+    command: bash "$(git rev-parse --git-path cezar-upstream-update.sh)" verify && bash "$(git rev-parse --git-path cezar-upstream-update.sh)" fresh
   - id: pr
     type: github.draft-pr
-    title: Integrate upstream Horolog updates
+    title: Integrate upstream updates
   - id: success
     type: end
     status: success
@@ -105,13 +114,17 @@ edges:
   - from: start.next
     to: preflight
   - from: preflight.pass
+    to: current
+  - from: current.pass
+    to: success
+  - from: current.fail
     to: needed
   - from: preflight.fail
     to: failed
   - from: needed.pass
     to: merge
   - from: needed.fail
-    to: success
+    to: failed
   - from: merge.pass
     to: verify
   - from: merge.fail
@@ -149,7 +162,11 @@ edges:
   - from: repair.failed
     to: failed
   - from: approval.approve
+    to: final-verify
+  - from: final-verify.pass
     to: pr
+  - from: final-verify.fail
+    to: failed
   - from: approval.reject
     to: failed
   - from: approval.timeout

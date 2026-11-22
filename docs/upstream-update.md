@@ -1,27 +1,38 @@
 # Upstream updates with Cezar
 
-Select `safe-upstream-update` as the workflow in a Cezar automation or task.
-Configure the project base branch as `main` and run with a worktree. The task
-must start at the current `origin/main`; it stops if the fork advanced before
-preflight. Configure `origin` as the fork and `upstream` as the Horolog source
-(currently `https://github.com/ujjwalredd/horolog.git`). Both need a `main`
-branch and fetch access. Publishing also needs permission to push a task branch
-and create a PR on the fork. Install the repository's Node and Python test
-and build dependencies first (`npm run check` must be available).
+Select `safe-upstream-update` for a task in a dedicated worktree based on the
+current `origin/main`. The workflow and its matching script must both be
+committed and integrated into that base before starting a task: the cockpit can
+load a local workflow while the task worktree uses committed base files.
+Configure `origin` as the Rakazo fork and `upstream` as
+the intended Rakazo upstream. Check the remote URLs before running: the script
+cannot establish whether a configured remote is trustworthy. Both need a
+`main` branch and fetch access. Publishing requires permission to push a task
+branch and create a pull request on the fork.
 
-The workflow fetches both branches, records their tips and compares them. If
-upstream is already an ancestor of the fork it finishes without a PR. Otherwise
-it merges the recorded upstream commit, asks Codex to resolve conflicts, checks
-ancestry and a clean worktree, runs `npm run check`, and has Codex review the
-result. Failed checks and review findings get at most two repair attempts.
-Unresolved conflicts, failing verification, missing dependencies and blocked
-reviews stop the run. The review is advisory, not proof that every customization
-survived: inspect the diff and migration notes yourself.
+Install the Node version and pnpm specified in `package.json`, then install the
+workspace dependencies. The workflow runs `pnpm lint`, `pnpm check`, and
+`pnpm test`; repository CI provides additional build, integration and end-to-end
+coverage. Missing dependencies or checks that need unavailable services can stop
+the run. Desktop Electron end-to-end tests belong in CI, not routine local runs.
 
-Approval at the human gate pushes the task branch and opens a **draft PR** to
-the task's base (`main`). It does not merge the PR or deploy. Rejecting or
-letting the gate time out publishes nothing. Cezar must be able to pause for
-human approval, so do not configure the automation to bypass the gate. Review
-the PR, CI, migrations and deployment procedure separately. Repeated scheduled
-runs can produce separate PRs while earlier updates remain unmerged; check for
-existing PRs before approving publication.
+The workflow records both fetched tips and merges the upstream commit if it is
+not already included. It resolves conflicts with Codex, verifies ancestry and
+the worktree, runs checks, and requests an independent review. Failed checks or
+review findings get at most two repair attempts. Its Git verification script is
+copied from the original task commit before merging, so an upstream change to
+the script does not replace the checks during this run.
+
+Run only in an isolated environment with no production credentials or sensitive
+files: merged code and dependency scripts can execute before approval. Human
+approval permits pushing the task branch and opening a draft PR; it does not
+merge or deploy. After approval the workflow checks that the fork's main branch
+has not advanced; if it has, start a new run. The branch could still advance
+between that check and PR creation, so review the PR's current base and CI
+before merging. Review migrations and fork customizations explicitly. Scheduled
+runs can create separate PRs while previous updates remain unmerged.
+
+The Git safety steps assume `origin/main` and `upstream/main`; the checks and
+review requirements are specific to this repository. Reusing the workflow for
+another repository requires choosing its remotes, branches, dependencies and
+validation commands; there is no universally correct test command.
