@@ -10,7 +10,9 @@ cannot establish whether a configured remote is trustworthy. Both need a
 `main` branch and fetch access. Publishing requires permission to push a task
 branch and create a pull request on the fork.
 
-Install a Node version supported by `package.json` and npm. The workflow
+Install a Node version supported by `package.json` and npm, either on PATH or
+in the standard nvm installation directory. The workflow selects a supported
+version for its own commands without changing the system default. The workflow
 installs workspace dependencies using the specified pnpm version, then runs
 lint, Turbo checks, the Node script tests and Vitest sequentially; repository CI
 provides additional build, integration and end-to-end coverage. Missing dependencies or checks that need unavailable services can stop

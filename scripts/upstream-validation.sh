@@ -3,6 +3,25 @@
 set -euo pipefail
 status=$(git rev-parse --git-path cezar-upstream-check-status)
 fail() { echo "$*" >&2; exit 1; }
+select_node() {
+  local candidate version major minor
+  local -a candidates=()
+  if command -v node >/dev/null; then candidates+=("$(command -v node)"); fi
+  for candidate in "${NVM_DIR:-$HOME/.nvm}"/versions/node/*/bin/node; do
+    test -x "$candidate" && candidates+=("$candidate")
+  done
+  for candidate in "${candidates[@]}"; do
+    version=$("$candidate" -p 'process.versions.node' 2>/dev/null) || continue
+    IFS=. read -r major minor _ <<< "$version"
+    if [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] &&
+       { (( major == 24 && minor >= 15 )) || (( major >= 26 )); }; then
+      export PATH="$(dirname "$candidate"):$PATH"
+      return 0
+    fi
+  done
+  fail 'No supported Node found; install Node ^24.15.0 or >=26.0.0 or add it to PATH'
+}
+case "${1:-}" in environment|prepare|checks) select_node ;; esac
 case "${1:-}" in
   environment)
     for cmd in node npm python3 systemd-run taskset timeout; do
