@@ -26,8 +26,8 @@ const TAG_BYTES = 16;
 function legacyKeyFrom(secret: string): Buffer {
   const hash = createHash("sha256");
   // Keep the historical derivation so existing ciphertext remains readable.
-  // codeql[js/insufficient-password-hash]
 
+  // codeql[js/insufficient-password-hash]
   hash.update(secret);
   return hash.digest();
 }

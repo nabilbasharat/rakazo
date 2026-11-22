@@ -25,8 +25,8 @@ export function mcpOAuthPartition(appUrl: string, serverId: string) {
   const partitionKey = JSON.stringify([new URL(appUrl).origin, serverId]);
   const hash = createHash("sha256");
   // This stable namespace is not a credential or password verifier.
-  // codeql[js/insufficient-password-hash]
 
+  // codeql[js/insufficient-password-hash]
   hash.update(partitionKey);
   const digest = hash.digest("hex").slice(0, 24);
   return `persist:rakazo-mcp-${digest}`;
